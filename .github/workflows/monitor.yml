@@ -1,0 +1,45 @@
+name: Austria Appointment Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Check appointments
+        env:
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python monitor.py
+
+      - name: Save alert state
+        if: always()
+        run: |
+          if [ -f last_signature.txt ]; then
+            git config user.name "Austria Appointment Monitor"
+            git config user.email "actions@users.noreply.github.com"
+            git add last_signature.txt
+            git diff --cached --quiet || git commit -m "Update appointment alert state"
+            git push || true
+          fi
